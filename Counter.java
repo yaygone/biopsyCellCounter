@@ -58,13 +58,20 @@ public class Counter extends JFrame
 		outputs.add(open(outputs.get(outputs.size() - 1), 2));
 
 		finalOutput = cloneBI(outputs.get(outputs.size() - 1));
+
+		imageMap = new boolean[finalOutput.getWidth()][finalOutput.getHeight()];
 		for (int x = 0; x < finalOutput.getWidth(); x++)
 			for (int y = 0; y < finalOutput.getHeight(); y++)
+				imageMap[x][y] = (finalOutput.getRGB(x, y) & 1) == 1;
+
+		for (int x = 0; x < imageMap.length; x++)
+			for (int y = 0; y < imageMap[0].length; y++)
 			{
 				countFromPixel(x, y);
 				if (area > 9) count++;
 				area = 0;
 			}
+
 	}
 
 	/**
@@ -261,17 +268,12 @@ public class Counter extends JFrame
 	 */
 	public void countFromPixel(int x, int y)
 	{
-		if (finalOutput.getRGB(x, y) != 0xFFFFFFFF) return;
-		finalOutput.setRGB(x, y, 0xFF000000);
+		if (!imageMap[x][y]) return;
+		imageMap[x][y] = false;
 		area++;
 		try { if (x > 0) countFromPixel(x - 1, y); } catch (Exception e) {}
 		try { if (y > 0) countFromPixel(x, y - 1); } catch (Exception e) {}
-		try { if (x < finalOutput.getWidth() - 1) countFromPixel(x + 1, y); } catch (Exception e) {}
-		try { if (y < finalOutput.getHeight() - 1) countFromPixel(x, y + 1); } catch (Exception e) {}
-	}
-
-	public void countRangeInRow(int minX, int maxX, int Y)
-	{
-
+		try { if (x < imageMap.length - 1) countFromPixel(x + 1, y); } catch (Exception e) {}
+		try { if (y < imageMap[0].length - 1) countFromPixel(x, y + 1); } catch (Exception e) {}
 	}
 }
