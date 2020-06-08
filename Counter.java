@@ -16,6 +16,7 @@ public class Counter extends JFrame
 	List<BufferedImage> outputs = new ArrayList<BufferedImage>();
 	int count;
 	int area;
+	boolean[][] imageMap;
 
 	public static void main(String[] args)
 	{
@@ -50,20 +51,29 @@ public class Counter extends JFrame
 		outputs.add(medianFilter(outputs.get(outputs.size() - 1)));
 		outputs.add(gaussBlur(outputs.get(outputs.size() - 1)));
 		outputs.add(contrast(outputs.get(outputs.size() - 1), 30, 150));
-		outputs.add(threshold(outputs.get(outputs.size() - 1)));
+		outputs.add(gaussBlur(outputs.get(outputs.size() - 1)));
+		outputs.add(threshold(outputs.get(outputs.size() - 1), 200));
 		outputs.add(open(outputs.get(outputs.size() - 1), 1));
 		outputs.add(close(outputs.get(outputs.size() - 1), 1));
 		outputs.add(open(outputs.get(outputs.size() - 1), 2));
-		outputs.add(dilate(outputs.get(outputs.size() - 1)));
 
 		finalOutput = cloneBI(outputs.get(outputs.size() - 1));
 		for (int x = 0; x < finalOutput.getWidth(); x++)
 			for (int y = 0; y < finalOutput.getHeight(); y++)
+			{
 				countFromPixel(x, y);
 				if (area > 9) count++;
 				area = 0;
+			}
 	}
 
+	/**
+	 * Increases the contrast of an image by expanding the dynamic range within the given parameters.
+	 * @param image The image object to be processed. The object is unchanged.
+	 * @param low Lower threshold to be reset to 0
+	 * @param high Upper threshold to be reset to 255
+	 * @return An image object with the effect applied
+	 */
 	public static BufferedImage contrast(BufferedImage image, int low, int high)
 	{
 		BufferedImage temp = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_BYTE_GRAY);
@@ -73,6 +83,13 @@ public class Counter extends JFrame
 		return temp;
 	}
 
+	/**
+	 * Takes a greyscale pixel value in 24-bits, and transforms it to its relative position between the low and high parameteric values.
+	 * @param rgb 24-bit length RGB value to transform
+	 * @param low Lower threshold to be reset to 0
+	 * @param high Upper threshold to be reset to 255
+	 * @return The transformed integer value
+	 */
 	public static int contrast(int rgb, int low, int high)
 	{
 		int mask = 0x10101;
@@ -83,6 +100,11 @@ public class Counter extends JFrame
 		return (int)((rgb - low) / diff * 255) * mask;
 	}
 
+	/**
+	 * Applies a Gaussian matrix to an image.
+	 * @param image The image object to be processed. The object is unchanged.
+	 * @return An image object with the effect applied
+	 */
 	public static BufferedImage gaussBlur(BufferedImage image)
 	{
 		BufferedImage temp = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_BYTE_GRAY);
@@ -97,6 +119,11 @@ public class Counter extends JFrame
 		return temp;
 	}
 
+	/**
+	 * Applies a Laplacian matrix to an image.
+	 * @param image The image object to be processed. The object is unchanged.
+	 * @return An image object with the effect applied
+	 */
 	public static BufferedImage laplDiff(BufferedImage image)
 	{
 		BufferedImage temp = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_BYTE_GRAY);
@@ -113,6 +140,11 @@ public class Counter extends JFrame
 		return temp;
 	}
 
+	/**
+	 * Resets each pixel in an image to the median value of its neighbourhood.
+	 * @param image The image object to be processed. The object is unchanged.
+	 * @return An image object with the effect applied
+	 */
 	public static BufferedImage medianFilter(BufferedImage image)
 	{
 		BufferedImage temp = cloneBI(image);
@@ -123,12 +155,18 @@ public class Counter extends JFrame
 				for (int a = x - 1; a <= x + 1; a++)
 					for (int b = y - 1; b <= y + 1; b++)
 						matrix.add(image.getRGB(x, y));
-				Collections.sort(matrix);
+				matrix.sort((Integer i1, Integer i2) -> i1.intValue() - i2.intValue());
 				image.setRGB(x, y, matrix.get(4).intValue());
 			}
 		return temp;
 	}
 
+	/**
+	 * Erodes the image a number of times, then dilates the image the same number of times.
+	 * @param image The image object to be processed. The object is unchanged.
+	 * @param depth The iterations of sub-steps
+	 * @return An image object with the effect applied
+	 */
 	public static BufferedImage open(BufferedImage image, int depth)
 	{
 		BufferedImage temp = cloneBI(image);
@@ -137,6 +175,12 @@ public class Counter extends JFrame
 		return temp;
 	}
 
+	/**
+	 * Dilates the image a number of times, then erodes the image the same number of times.
+	 * @param image The image object to be processed. The object is unchanged.
+	 * @param depth The iterations of sub-steps
+	 * @return An image object with the effect applied
+	 */
 	public static BufferedImage close(BufferedImage image, int depth)
 	{
 		BufferedImage temp = cloneBI(image);
@@ -145,9 +189,19 @@ public class Counter extends JFrame
 		return temp;
 	}
 
+	/**
+	 * Deactivates active pixels if they neighbour an inactive pixel.
+	 * @param image The image object to be processed. The object is unchanged.
+	 * @return An image object with the effect applied
+	 */
 	public static BufferedImage erode(BufferedImage image)
 	{ return invert(dilate(invert(image))); }
 
+	/**
+	 * Activates inactive pixels if they neighbour an activated pixel.
+	 * @param image The image object to be processed. The object is unchanged.
+	 * @return An image object with the effect applied
+	 */
 	public static BufferedImage dilate(BufferedImage image)
 	{
 		BufferedImage temp = cloneBI(image);
@@ -162,6 +216,11 @@ public class Counter extends JFrame
 		return temp;
 	}
 
+	/**
+	 * Inverts pixel activation - black turns white, white turns black.
+	 * @param image The image object to be processed. The object is unchanged.
+	 * @return An image object with the effect applied
+	 */
 	public static BufferedImage invert(BufferedImage image)
 	{
 		BufferedImage temp = cloneBI(image);
@@ -171,31 +230,48 @@ public class Counter extends JFrame
 		return temp;
 	}
 
-	public static BufferedImage threshold(BufferedImage image)
+	/**
+	 * Creates an image of binary pixels that are either 0 or 1 (black or white).
+	 * @param image The image object to be processed. The object is unchanged.
+	 * @param cutoff Integer cutoff. Pixels with value above the cutoff will be active, and below will be inactive.
+	 * @return An image object with the effect applied
+	 */
+	public static BufferedImage threshold(BufferedImage image, int cutoff)
 	{
 		BufferedImage temp = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_BYTE_BINARY);
 		for (int x = 0; x < image.getWidth(); x++)
 			for (int y = 0; y < image.getHeight(); y++)
-				temp.setRGB(x, y, (image.getRGB(x, y) & 0xFFFFFF) >= (0xFFFFFF) ? 0xFFFFFFFF : 0);
+				temp.setRGB(x, y, (image.getRGB(x, y) & 0xFFFFFF) >= (cutoff * 0x10101) ? 0xFFFFFFFF : 0);
 		image = temp;
 		return temp;
 	}
 
+	/**
+	 * Returns an identical duplicate BufferedImage object.
+	 * @param image The image object to be processed. The object is unchanged.
+	 * @return Duplicate object of separate reference
+	 */
 	public static BufferedImage cloneBI(BufferedImage image)
 	{ return new ConvolveOp(new Kernel(1, 1, new float[] {1f})).filter(image, null); }
 
+	/**
+	 * 
+	 * @param x 
+	 * @param y
+	 */
 	public void countFromPixel(int x, int y)
 	{
-		try{
-			if (finalOutput.getRGB(x, y) != 0xFFFFFFFF) return;
-			finalOutput.setRGB(x, y, 0xFF000000);
-			area++;
-			try { if (x > 0) countFromPixel(x - 1, y); } catch (Exception e) {}
-			try { if (y > 0) countFromPixel(x, y - 1); } catch (Exception e) {}
-			try { if (x < finalOutput.getWidth() - 1) countFromPixel(x + 1, y); } catch (Exception e) {}
-			try { if (y < finalOutput.getHeight() - 1) countFromPixel(x, y + 1); } catch (Exception e) {}
+		if (finalOutput.getRGB(x, y) != 0xFFFFFFFF) return;
+		finalOutput.setRGB(x, y, 0xFF000000);
+		area++;
+		try { if (x > 0) countFromPixel(x - 1, y); } catch (Exception e) {}
+		try { if (y > 0) countFromPixel(x, y - 1); } catch (Exception e) {}
+		try { if (x < finalOutput.getWidth() - 1) countFromPixel(x + 1, y); } catch (Exception e) {}
+		try { if (y < finalOutput.getHeight() - 1) countFromPixel(x, y + 1); } catch (Exception e) {}
+	}
 
-		}catch (Exception e)
-		{}
+	public void countRangeInRow(int minX, int maxX, int Y)
+	{
+
 	}
 }
