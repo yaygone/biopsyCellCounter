@@ -1,51 +1,63 @@
 import java.awt.image.*;
 import java.io.*;
 import java.util.*;
-
 import java.awt.GridLayout;
 import java.awt.geom.AffineTransform;
-
 import javax.imageio.*;
 import javax.swing.*;
 
 public class Counter extends JFrame
 {
 	static String fileName;
-	BufferedImage image;
-	BufferedImage finalOutput;
 	List<BufferedImage> outputs = new ArrayList<BufferedImage>();
-	int count;
-	int area;
 	boolean[][] imageMap;
+	int count;
 
+	/**
+	 * Tests input condition and constructs a Counter object
+	 * @param args Singleton array of input file name
+	 */
 	public static void main(String[] args)
 	{
 		try
 		{
-			if (args.length != 1) throw new IllegalArgumentException("Usage: java Counter <image file name>");
-			else fileName = args[0]; new Counter();
+			if (args.length != 1) throw new IllegalArgumentException("Usage: java Counter <image_file_name.jpg>");
+			fileName = args[0];
+			new Counter();
 		}
 		catch (Exception e) { System.out.println(e); }
 	}
 
+	/**
+	 * Constructor creates a GUI window and processes image
+	 */
 	public Counter() throws IOException, InterruptedException
 	{
-		super("");
+		super();
 		setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 		process();
-		GridLayout grid = new GridLayout(3, 3);
+		GridLayout grid = new GridLayout(4, 3);
 		this.setLayout(grid);
+		// Add every image through the process, resized to half
 		for (BufferedImage image : outputs)
 			this.add(new JLabel(new ImageIcon(new AffineTransformOp(AffineTransform.getScaleInstance(0.5, 0.5), AffineTransformOp.TYPE_BILINEAR).filter(image, null))));
+		// Result is output as title of window and to the console output
 		this.setTitle("Number of cells counted: " + count);
+		System.out.println("Number of cells counted: " + count);
 		pack();
 		setVisible(true);
 	}
 
+	/**
+	 * Pipelines, finalises, and counts the clusters in the input image
+	 * @throws IOException Bypass exception from ImageIO
+	 */
 	public void process() throws IOException
 	{
+		// Raw image input
 		outputs.add(ImageIO.read(new File(fileName)));
 
+		// Image processing pipeline
 		outputs.add(laplDiff(outputs.get(outputs.size() - 1)));
 		outputs.add(contrast(outputs.get(outputs.size() - 1), 10, 150));
 		outputs.add(medianFilter(outputs.get(outputs.size() - 1)));
@@ -57,20 +69,17 @@ public class Counter extends JFrame
 		outputs.add(close(outputs.get(outputs.size() - 1), 1));
 		outputs.add(open(outputs.get(outputs.size() - 1), 2));
 
-		finalOutput = cloneBI(outputs.get(outputs.size() - 1));
-
+		// Finalise and prepare for counting
+		BufferedImage finalOutput = outputs.get(outputs.size() - 1);
 		imageMap = new boolean[finalOutput.getWidth()][finalOutput.getHeight()];
 		for (int x = 0; x < finalOutput.getWidth(); x++)
 			for (int y = 0; y < finalOutput.getHeight(); y++)
 				imageMap[x][y] = (finalOutput.getRGB(x, y) & 1) == 1;
 
+		// Count pixels, only clusters of 10 pixels or more are considered
 		for (int x = 0; x < imageMap.length; x++)
 			for (int y = 0; y < imageMap[0].length; y++)
-			{
-				countFromPixel(x, y);
-				if (area > 9) count++;
-				area = 0;
-			}
+				if (countFromPixel(x, y) > 9) count++;
 
 	}
 
@@ -262,18 +271,23 @@ public class Counter extends JFrame
 	{ return new ConvolveOp(new Kernel(1, 1, new float[] {1f})).filter(image, null); }
 
 	/**
-	 * 
-	 * @param x 
-	 * @param y
+	 * Recursively searches through a 2-dimensional boolean array and calculates the area. Cells that have been checked are marked as inactive.
+	 * @param x The x co-ordinate of the map to be checked
+	 * @param y The y co-ordinate of the map to be checked
+	 * @return Total area of the activated cluster
 	 */
-	public void countFromPixel(int x, int y)
+	public int countFromPixel(int x, int y)
 	{
-		if (!imageMap[x][y]) return;
-		imageMap[x][y] = false;
-		area++;
-		try { if (x > 0) countFromPixel(x - 1, y); } catch (Exception e) {}
-		try { if (y > 0) countFromPixel(x, y - 1); } catch (Exception e) {}
-		try { if (x < imageMap.length - 1) countFromPixel(x + 1, y); } catch (Exception e) {}
-		try { if (y < imageMap[0].length - 1) countFromPixel(x, y + 1); } catch (Exception e) {}
+		// Exception will trigger for out-of-bound x or y values
+		try
+		{
+			// If this pixel is inactive, don't search any further
+			if (!imageMap[x][y]) return 0;
+			// Otherwise, set it to active and return the area of this branch
+			imageMap[x][y] = false;
+			return 1 + countFromPixel(x - 1, y) + countFromPixel(x, y - 1) + countFromPixel(x + 1, y) + countFromPixel(x, y + 1);
+		}
+		catch (Exception e)
+		{ return 0; }
 	}
 }
