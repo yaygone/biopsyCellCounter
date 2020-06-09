@@ -25,7 +25,7 @@ public class Counter extends JFrame
 			fileName = args[0];
 			new Counter();
 		}
-		catch (Exception e) { System.out.println(e); }
+		catch (Exception e) { System.out.println(e); e.printStackTrace(); }
 	}
 
 	/**
@@ -59,15 +59,15 @@ public class Counter extends JFrame
 
 		// Image processing pipeline
 		outputs.add(laplDiff(outputs.get(outputs.size() - 1)));
+		outputs.add(medianFilter(outputs.get(outputs.size() - 1)));
 		outputs.add(contrast(outputs.get(outputs.size() - 1), 10, 150));
 		outputs.add(medianFilter(outputs.get(outputs.size() - 1)));
 		outputs.add(gaussBlur(outputs.get(outputs.size() - 1)));
-		outputs.add(contrast(outputs.get(outputs.size() - 1), 30, 150));
+		outputs.add(contrast(outputs.get(outputs.size() - 1), 30, 100));
 		outputs.add(gaussBlur(outputs.get(outputs.size() - 1)));
-		outputs.add(threshold(outputs.get(outputs.size() - 1), 200));
+		outputs.add(threshold(outputs.get(outputs.size() - 1), 150));
 		outputs.add(open(outputs.get(outputs.size() - 1), 1));
 		outputs.add(close(outputs.get(outputs.size() - 1), 1));
-		outputs.add(open(outputs.get(outputs.size() - 1), 2));
 
 		// Finalise and prepare for counting
 		BufferedImage finalOutput = outputs.get(outputs.size() - 1);
@@ -76,11 +76,10 @@ public class Counter extends JFrame
 			for (int y = 0; y < finalOutput.getHeight(); y++)
 				imageMap[x][y] = (finalOutput.getRGB(x, y) & 1) == 1;
 
-		// Count pixels, only clusters of 10 pixels or more are considered
+		// Count pixels, only clusters of 6 pixels or more are considered
 		for (int x = 0; x < imageMap.length; x++)
 			for (int y = 0; y < imageMap[0].length; y++)
-				if (countFromPixel(x, y) > 9) count++;
-
+				if (countArea(x, y) >= 6) count++;
 	}
 
 	/**
@@ -170,9 +169,9 @@ public class Counter extends JFrame
 				List<Integer> matrix = new ArrayList<Integer>();
 				for (int a = x - 1; a <= x + 1; a++)
 					for (int b = y - 1; b <= y + 1; b++)
-						matrix.add(image.getRGB(x, y));
-				matrix.sort((Integer i1, Integer i2) -> i1.intValue() - i2.intValue());
-				image.setRGB(x, y, matrix.get(4).intValue());
+						matrix.add(image.getRGB(a, b));
+				Collections.sort(matrix);
+				temp.setRGB(x, y, matrix.get(4).intValue());
 			}
 		return temp;
 	}
@@ -271,23 +270,45 @@ public class Counter extends JFrame
 	{ return new ConvolveOp(new Kernel(1, 1, new float[] {1f})).filter(image, null); }
 
 	/**
-	 * Recursively searches through a 2-dimensional boolean array and calculates the area. Cells that have been checked are marked as inactive.
+	 * Searches through a 2-dimensional boolean array and calculates the area of continuous activated cells. Cells that have been checked are marked as inactive.
 	 * @param x The x co-ordinate of the map to be checked
 	 * @param y The y co-ordinate of the map to be checked
 	 * @return Total area of the activated cluster
 	 */
-	public int countFromPixel(int x, int y)
+	public int countArea(int x, int y)
 	{
-		// Exception will trigger for out-of-bound x or y values
-		try
+		Stack<CoOrd> stack = new Stack<CoOrd>();
+		int area = 0;
+		CoOrd curr = new CoOrd(x, y);
+		stack.add(curr);
+
+		while (!stack.isEmpty())
 		{
-			// If this pixel is inactive, don't search any further
-			if (!imageMap[x][y]) return 0;
-			// Otherwise, set it to active and return the area of this branch
-			imageMap[x][y] = false;
-			return 1 + countFromPixel(x - 1, y) + countFromPixel(x, y - 1) + countFromPixel(x + 1, y) + countFromPixel(x, y + 1);
+			CoOrd temp = stack.pop();
+			if (imageMap[temp.x][temp.y])
+			{
+				imageMap[temp.x][temp.y] = false;
+				area++;
+				if (temp.x > 0)
+				{
+
+					stack.add(new CoOrd(temp.x - 1, temp.y));
+				}
+				if (temp.y > 0) stack.add(new CoOrd(temp.x, temp.y - 1));
+				if (temp.x < imageMap.length - 1) stack.add(new CoOrd(temp.x + 1, temp.y));
+				if (temp.y < imageMap[0].length - 1) stack.add(new CoOrd(temp.x, temp.y + 1));
+			}
 		}
-		catch (Exception e)
-		{ return 0; }
+		return area;
+	}
+
+	class CoOrd
+	{
+		int x, y;
+		public CoOrd(int x, int y)
+		{
+			this.x = x;
+			this.y = y;
+		}
 	}
 }
