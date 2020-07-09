@@ -6,6 +6,9 @@ import java.awt.geom.AffineTransform;
 import javax.imageio.*;
 import javax.swing.*;
 
+/**
+ * @author Ye-Gon Ryoo
+ */
 public class Counter extends JFrame
 {
 	static String fileName;
